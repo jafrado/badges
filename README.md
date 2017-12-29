@@ -59,14 +59,22 @@ attributes information to hit the above goals
    - Generate QRCode with VCARD Info for Contact (Email and TRA/NAR #, Signature only)
    - Show TRA or NAR badge based on Organization ID
    - Generate FLIER, STAFF, VENDOR based on keywords in Signature
-
+   - Generate UUID from Email Address+ID
+   - Generate Barcode from UUID
 # Prerequisites
 
 Install Perl on a Modern Debian distribution, install packages below:
 
-	- cpan install Text::CSV
-	- cpan install Image::Magick
-	- cpan install Imager::QRCode
+	- cpan Text::CSV
+	- cpan Image::Magick
+	- cpan Imager::QRCode
+	- cpan GD
+	- cpan GD::Barcode
+        - cpan Data::GUID
+	- cpan File::Slurp
+	- cpan MIME::Base64
+	- cpan Crypt::OpenSSL::RSA
+	- cpan Digest::SHA
 
 NOTE: cpan -l will list installed packages.
 
