@@ -4,26 +4,33 @@ Event Badge Generator
 
 # We Don't Need no Stinking Badges!
 
-Is a widely quoted paraphrase of a line of dialogue from the 1948 film The Treasure of the Sierra Madre.[1] 
-That line was in turn derived from dialogue in the 1927 novel, The Treasure of the Sierra Madre, which was the basis for the film. The original version of the line appeared in B. Traven's novel The Treasure of the Sierra Madre (1927):
+Is a widely quoted paraphrase of a line of dialogue from the 1948 film The 
+Treasure of the Sierra Madre.[1]  That line was in turn derived from dialogue
+in the 1927 novel, The Treasure of the Sierra Madre, which was the basis for 
+the film. The original version of the line appeared in B. Traven's novel 
+The Treasure of the Sierra Madre (1927):
 
-      "All right," Curtin shouted back. "If you are the police, where are your badges? Let's see them." 
-      "Badges, to god-damned hell with badges! We have no badges. In fact, we don't need badges. I don't 
-      have to show you any stinking badges, you god-damned cabrón and chinga tu madre!"
+      "All right," Curtin shouted back. "If you are the police, where 
+      are your badges? Let's see them." 
+      "Badges, to god-damned hell with badges! We have no badges. 
+      In fact, we don't need badges. I don't have to show you any 
+      stinking badges, you god-damned cabrón and chinga tu madre!"
 
-The line was popularized by John Huston's 1948 film adaptation of the novel, which was altered from its content 
-in the novel to meet the Motion Picture Production Code regulations severely limiting profanity in film.[3] In 
-one scene, a Mexican bandit leader named "Gold Hat"[4] (portrayed by Alfonso Bedoya) tries to convince Fred C. 
-Dobbs (Humphrey Bogart)[5] that he and his company are Federales:
+The line was popularized by John Huston's 1948 film adaptation of the novel, 
+which was altered from its content in the novel to meet the Motion Picture
+Production Code regulations severely limiting profanity in film.[3] In one 
+scene, a Mexican bandit leader named "Gold Hat"[4] (portrayed by
+Alfonso Bedoya) tries to convince Fred C. Dobbs (Humphrey Bogart)[5] 
+that he and his company are Federales:
 
   	Dobbs: "If you're the police, then where are your badges?"
- 	Gold Hat: "Badges? We ain't got no badges. We don't need no badges. I don't have to show 
-           you any stinkin' badges!
+ 	Gold Hat: "Badges? We ain't got no badges. We don't need no 
+                  badges. I don't have to show you any stinkin' badges!"
 
 - See also - https://en.wikipedia.org/wiki/Stinking_badges
 
-The point was that without a badge, Dobbs had no way to validate Gold Hat was a Federale when in fact 
-he was actually a bandit.
+The point was that without a badge, Dobbs had no way to validate Gold Hat 
+was a Federale when in fact he was actually a bandit.
 
 # What Makes a Good Badge
 
@@ -60,7 +67,9 @@ attributes information to hit the above goals
    - Show TRA or NAR badge based on Organization ID
    - Generate FLIER, STAFF, VENDOR based on keywords in Signature
    - Generate UUID from Email Address+ID
-   - Generate Barcode from UUID
+   - Generate Digital Signature from Email address and Private signing Key
+   - Generate Barcode from ID
+
 # Prerequisites
 
 Install Perl on a Modern Debian distribution, install packages below:
@@ -85,6 +94,25 @@ NOTE: cpan -l will list installed packages.
   - Output will be in the "badges" subdirectory of this folder
   - Resulting PNG files ready for printing
   - Sample file provided with a couple full-featured examples (rm_empties.csv)
+
+# Tweaking output
+
+Once all of the PNG files are in the badges directory and a complete set
+has been generated, you can use ImageMagick convert from the command line
+to round all of the edges like the below command which can be run in C-Shell
+from within the badges directory:
+
+ foreach i (`ls *.png`)
+     echo $i
+      convert $i \
+        \( +clone  -alpha extract \
+	-draw 'fill black polygon 0,0 0,15 15,0 fill white circle 15,15 15,0' \
+        \( +clone -flip \) -compose Multiply -composite \
+        \( +clone -flop \) -compose Multiply -composite \
+     \) -alpha off -compose CopyOpacity -composite  $i
+ end
+
+
 	
 # Future Directions
 

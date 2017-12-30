@@ -352,6 +352,20 @@ for my $r (@rows) {
                              fill=>'black', text=>$text);
 	    
 	}
+
+	# Special Spectator 
+	if (($r->[SIGNATURE] =~ m/Spectator/)||
+	    ($r->[SIGNATURE] =~ m/Visitor/)) {
+
+	    print "SPECTATOR\n----\n";
+	    $badge->Draw(stroke=>'white', fill=>'Red', 
+                         primitive=>'rectangle', points=>'0,1090,820,1230');
+	    $text = '     SPECTATOR';
+	    $badge->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
+			     x=>10, y=>(23*$font_step-30), pointsize=>'80', 
+                             fill=>'black', text=>$text);
+	    
+	}
     }
 
     $font_step = 53;
@@ -434,7 +448,7 @@ for my $r (@rows) {
     $image->Read("$TOPDIR/$idcode-upc.png");
     my $barcode = $image->[ (scalar @$image - 1)];
     # Image is 810x1230, barcode 109x50, put towards bottom left
-    $badge->Composite(image=>$barcode, x=>50, y=>1180);
+    $badge->Composite(image=>$barcode, x=>8, y=>1180);
     system "rm -f $TOPDIR/$idcode-upc.png";
 
     # Signature text on bottom of badge
@@ -454,6 +468,7 @@ for my $r (@rows) {
     warn "$x" if "$x";
 
     print "Wrote Badge: [".$filename."]\n";
+    $filename = $TOPDIR."LDRS37-Badge-00".$idcode."-".$r->[ORG]."-".$r->[IDNUM].".png";
 
 }
 
