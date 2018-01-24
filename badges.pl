@@ -32,13 +32,14 @@ use Digest::SHA qw(sha512_hex sha256_hex);
 #
 # Offsets into CSV file for each row of data below
 use constant ID => 0;
-use constant EMAIL => 1;
-use constant FNAME => 2;
-use constant LNAME => 3;
-use constant ORG => 4;
-use constant IDNUM => 5;
-use constant CLEVEL  => 6;
-use constant SIGNATURE => 7;
+use constant DATE=>1;
+use constant EMAIL => 2;
+use constant FNAME => 3;
+use constant LNAME => 4;
+use constant ORG => 5;
+use constant IDNUM => 6;
+use constant CLEVEL  => 7;
+use constant SIGNATURE => 8;
 
 # Top-level directory where images will be dumped
 my $TOPDIR = "badges/";
@@ -181,7 +182,7 @@ for my $r (@rows) {
     my $banner = $image->[1];
 
     # Composite Banner on main badge
-    $badge->Composite($banner);#, x=>0, y=>0, geometry=>$geometry, opacity=>50);
+    $badge->Composite(image=>$banner);#, x=>0, y=>0, geometry=>$geometry, opacity=>50);
 
     # Set initial step size
     $font_step = 52;
@@ -318,7 +319,7 @@ for my $r (@rows) {
 
     $text = '        FLIER';
     $badge->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
-		     x=>30, y=>(23*$font_step-30), 
+		     x=>250, y=>(23*$font_step-30), 
                      pointsize=>'88', fill=>'black', text=>$text);
 
     # Signature not empty, match keywords for Vendor Lettering
@@ -326,6 +327,11 @@ for my $r (@rows) {
 
 	if (($r->[SIGNATURE] =~ m/Bay Area Rocketry/)||
 	    ($r->[SIGNATURE] =~ m/Vendor/)||
+	    ($r->[SIGNATURE] =~ m/Discount/)||	    	    
+	    ($r->[SIGNATURE] =~ m/Fruity/)||
+	    ($r->[SIGNATURE] =~ m/Rockets Magazine/)||
+	    ($r->[SIGNATURE] =~ m/Wildman/)||
+	    ($r->[SIGNATURE] =~ m/WILD/)||	    	    
 	    ($r->[SIGNATURE] =~ m/AMW/)) {
 	    print "VENDOR\n----\n";
 	    $badge->Draw(stroke=>'black', fill=>'orange', 
@@ -333,13 +339,14 @@ for my $r (@rows) {
 
 	    $text = '       VENDOR';
 	    $badge->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
-			     x=>30, y=>(23*$font_step-30), pointsize=>'88', 
+			     x=>180, y=>(23*$font_step-30), pointsize=>'88', 
                              fill=>'black', text=>$text);
 	    
 	}  
 	# Staff Lettering
 	if (($r->[SIGNATURE] =~ m/TCC/)||
 	    ($r->[SIGNATURE] =~ m/LDRS/)||
+	    ($r->[SIGNATURE] =~ m/TRA/)||
 	    ($r->[SIGNATURE] =~ m/Tripoli Central California/)||
 	    ($r->[SIGNATURE] =~ m/ANYTHING/)) {
 	    print "STAFF\n----\n";
@@ -348,7 +355,7 @@ for my $r (@rows) {
 
 	    $text = '        STAFF';
 	    $badge->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
-			     x=>30, y=>(23*$font_step-30), pointsize=>'88', 
+			     x=>250, y=>(23*$font_step-30), pointsize=>'88', 
                              fill=>'black', text=>$text);
 	    
 	}
@@ -362,7 +369,7 @@ for my $r (@rows) {
                          primitive=>'rectangle', points=>'0,1090,820,1230');
 	    $text = '     SPECTATOR';
 	    $badge->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
-			     x=>10, y=>(23*$font_step-30), pointsize=>'80', 
+			     x=>150, y=>(23*$font_step-30), pointsize=>'80', 
                              fill=>'black', text=>$text);
 	    
 	}
