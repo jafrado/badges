@@ -159,6 +159,11 @@ for my $r (@rows) {
 	    $fg_color = 'chartreuse';
 	    $font_color = 'black';
 	}
+    } else {
+	if ( ($r->[CLEVEL] eq "None") || ($r->[CLEVEL] eq "0") || ($r->[CLEVEL] eq "TMP") ) { 
+	    $cert_level = 0;
+	    $fg_color = 'red';
+	}
     }
 
     # Show each record field
@@ -246,6 +251,11 @@ for my $r (@rows) {
 
     #$text = $." ".substr($r->[CLEVEL], 0, 1).substr($r->[CLEVEL], 6, 6);
     $text = $r->[CLEVEL];
+
+    if ($text eq "None") {
+	$text  = "Level 0";
+    }
+    
     $image->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
 		     x=>30, y=>(19*$font_step+6), 
                      pointsize=>$ps, fill=>$font_color, text=>$text);
@@ -315,8 +325,8 @@ for my $r (@rows) {
     # Flier Lettering
     print "FLIER\n----\n";
     $badge->Draw(stroke=>'black', fill=>'chartreuse', 
-			  primitive=>'rectangle', points=>'0,1090,820,1230');
-
+		 primitive=>'rectangle', points=>'0,1090,820,1230');
+    
     $text = '        FLIER';
     $badge->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
 		     x=>250, y=>(23*$font_step-30), 
@@ -326,12 +336,19 @@ for my $r (@rows) {
     if ($r->[SIGNATURE] ne "") { 
 
 	if (($r->[SIGNATURE] =~ m/Bay Area Rocketry/)||
+	    ($r->[SIGNATURE] =~ m/Aerotech/)||
 	    ($r->[SIGNATURE] =~ m/Vendor/)||
 	    ($r->[SIGNATURE] =~ m/Discount/)||	    	    
 	    ($r->[SIGNATURE] =~ m/Fruity/)||
 	    ($r->[SIGNATURE] =~ m/Rockets Magazine/)||
 	    ($r->[SIGNATURE] =~ m/Wildman/)||
-	    ($r->[SIGNATURE] =~ m/WILD/)||	    	    
+	    ($r->[SIGNATURE] =~ m/M2/)||
+	    ($r->[SIGNATURE] =~ m/Madcow/)||
+	    ($r->[SIGNATURE] =~ m/Real/)||
+	    ($r->[SIGNATURE] =~ m/Eggtimer/)||
+	    ($r->[SIGNATURE] =~ m/WILD/)||
+	    ($r->[SIGNATURE] =~ m/APE/)||
+	    ($r->[SIGNATURE] =~ m/UMERG/)||	    	    	    
 	    ($r->[SIGNATURE] =~ m/AMW/)) {
 	    print "VENDOR\n----\n";
 	    $badge->Draw(stroke=>'black', fill=>'orange', 

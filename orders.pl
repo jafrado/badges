@@ -108,6 +108,7 @@ my %registrations = ();
 my %banquetdinners = ();
 my %stickerorders = ();
 my %ordertonames = ();
+my %orderdetails = ();
 my %discountamounts = ();
 my %totalitemcounts = ();
 my %totalpaid = ();
@@ -160,7 +161,8 @@ for my $r (@rows) {
 	$r->[B_ADDR12] =~ s/$str1_pat/$str1_rep/g;
 
 	$ordertonames{$r->[ORDER_NUMBER]} = "\n\n".$r->[B_FIRSTNAME]." ".$r->[B_LASTNAME]."\\newline\n".$r->[B_ADDR12]."\\newline\n".$r->[B_CITY].",".$r->[B_STATE]." ".$r->[B_ZIPCODE]."\\newline\n".$r->[B_CC]."\\newline\n";
-	
+
+	$orderdetails{$r->[ORDER_NUMBER]} = " received on ".$r->[ORDER_DATE];
 	$discountamounts{$r->[ORDER_NUMBER]} = $r->[CART_DISCOUNT_AMOUNT];
 	$totalitemcounts{$r->[ORDER_NUMBER]} = $r->[TOTAL_ITEMS];
 	$totalpaid{$r->[ORDER_NUMBER]} = $r->[ORDER_TOTAL_AMOUNT];
@@ -370,8 +372,23 @@ print TEXFILE "\\usepackage{graphicx}\n";
 print TEXFILE "\\usepackage[scaled]{helvet}\n";
 print TEXFILE "\\renewcommand\\familydefault{\\sfdefault}\n";
 print TEXFILE "\\usepackage[T1]{fontenc}\n";
+print TEXFILE "\\usepackage{color}\n";
 print TEXFILE "\\pagenumbering{gobble}\n\n";
 print TEXFILE "\\begin{document}\n";
+
+open(TEXFILE2, ">./$TOPDIR/banquet-tickets.tex") or die $!;
+
+# Document setup
+print TEXFILE2 "\\documentclass[letterpaper, 11pt]{article}\n";
+print TEXFILE2 "\\usepackage{amsmath}\n";
+print TEXFILE2 "\\usepackage{graphicx}\n";
+print TEXFILE2 "\\usepackage[scaled]{helvet}\n";
+print TEXFILE2 "\\renewcommand\\familydefault{\\sfdefault}\n";
+print TEXFILE2 "\\usepackage[T1]{fontenc}\n";
+print TEXFILE2 "\\usepackage{color}\n";
+print TEXFILE2 "\\pagenumbering{gobble}\n\n";
+print TEXFILE2 "\\begin{document}\n";
+
 
 foreach my $id(sort keys %registrations) {
     my $dinner = $banquetdinners{$id};
@@ -382,14 +399,12 @@ foreach my $id(sort keys %registrations) {
     my $discounts = $discountamounts{$id};
     my $items = $totalitemcounts{$id};
     my $total = $totalpaid{$id};
-
+    my $details = $orderdetails{$id};
     # Image header
     print TEXFILE "\\begin{center}\n";
     print TEXFILE "\\makebox[\\textwidth]{\\includegraphics[width=\\textwidth]{images/LDRS37-c.png}}\n";
     print TEXFILE "\\end{center}\n";
-
-    print TEXFILE "\\section\* {Order $id} \\label{sec:Order $id}\n";
-
+    print TEXFILE "\\section\* {Order $id $details} \\label{sec:Order $id $details}\n";
     print TEXFILE "$name\n";
 
     print " Order# $id\n";
@@ -397,6 +412,17 @@ foreach my $id(sort keys %registrations) {
     
     if ($dinner) { 
 	print TEXFILE "$dinner\n";
+    	# Dinners - Only output dinner information if there is an order for one
+#	print TEXFILE2 "\\pagecolor{green}\n\\color{white}\n";
+	print TEXFILE2 "\\begin{center}\n";
+	print TEXFILE2 "\\makebox[\\textwidth]{\\includegraphics[width=\\textwidth]{images/LDRS37-c.png}}\n";
+	print TEXFILE2 "\\end{center}\n";
+	print TEXFILE2 "\\section\* {LDRS37 Banquet Dinner Ticket $id } \\label{sec:LDRS37 Banquet Dinner Ticket $id }\n";
+	print TEXFILE2 "$name\n";
+	print TEXFILE2 "\\begin{itemize}\n";
+	print TEXFILE2 "$dinner\n";	
+	print TEXFILE2 "\\end{itemize}\n";
+	print TEXFILE2 "\\pagebreak\n";	
     }
     if ($reg) { 
 	print TEXFILE "\\item $reg\n";
@@ -414,12 +440,13 @@ foreach my $id(sort keys %registrations) {
     if ($discounts ne "0") {
 	print TEXFILE "\\newline Discounts:\\\$",$discounts,"\n";
     }
-    print TEXFILE "\\newline Total:\\\$", $total, "\n";
+    print TEXFILE "\\newline Total: \\\$", $total, " - Paid online via PayPal\n";
 
     print TEXFILE "\\pagebreak\n";
 }
 print TEXFILE "\\end{document}\n";
+print TEXFILE2 "\\end{document}\n";
 
 close TEXFILE;
-
+close TEXFILE2;
 
