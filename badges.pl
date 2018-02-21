@@ -476,7 +476,7 @@ for my $r (@rows) {
     system "rm -f $TOPDIR/$idcode-upc.png";
 
     # Signature text on bottom of badge
-    $text = "    Badge#".$idcode."        Signature:".$signature."\n";
+    $text = "    Badge#".$idcode."        Serial:".$signature."\n";
     $badge->Annotate(font=>'system', x=>160, y=>1226,fill=>'black', text=>$text);
     my $tcc_logo; 			      
     $image->Read('images/TCC_Logo_156x156.png');

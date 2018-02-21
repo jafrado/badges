@@ -112,6 +112,8 @@ my %orderdetails = ();
 my %discountamounts = ();
 my %totalitemcounts = ();
 my %totalpaid = ();
+my %phonecontacts = ();
+my %shortnames = ();
 
 # Top-level directory where images will be dumped
 my $TOPDIR = "orders/";
@@ -148,7 +150,8 @@ for my $r (@rows) {
     # gather row
     $csv->combine(@$r);
 
-    if ($r->[ORDER_STATUS] ne "Refunded") {    
+    if (($r->[ORDER_STATUS] ne "Refunded") && ($r->[ORDER_STATUS] ne "Cancelled")) {
+	
 	# push up order # into list of orders, don't add the order if it's in there already ...
 	push (@orderlist, $r->[ORDER_NUMBER]) unless grep{$_ == $r->[ORDER_NUMBER]} @orderlist;
 
@@ -160,12 +163,42 @@ for my $r (@rows) {
 	my $str1_rep = '\#';
 	$r->[B_ADDR12] =~ s/$str1_pat/$str1_rep/g;
 
-	$ordertonames{$r->[ORDER_NUMBER]} = "\n\n".$r->[B_FIRSTNAME]." ".$r->[B_LASTNAME]."\\newline\n".$r->[B_ADDR12]."\\newline\n".$r->[B_CITY].",".$r->[B_STATE]." ".$r->[B_ZIPCODE]."\\newline\n".$r->[B_CC]."\\newline\n";
+	# First Name Convert upper case to lower
+	my $fullname = lc($r->[B_FIRSTNAME]." ".$r->[B_LASTNAME]);
+	# Capitalize first letter of each word
+	$fullname =~ s/(\w+)/\u$1/g;
+
+
+	# Normalize US Phone numbers to (408) 867-5309 , else leave sequence as-is ...
+	my $phone = $r->[B_PHONE];
+	# Thanks Zaxo - http://www.perlmonks.org/bare/?node_id=259986
+	# convert alpha mnemonics
+	$phone =~ tr/A-PR-Z/222333444555666777888999/;
+	$phone =~ tr/a-pr-z/222333444555666777888999/;    
+	# get rid of any nondigits
+	$phone =~ s/\D//g;    
+	# format
+	$phone =~ s/^(\d{3})(\d{3})(\d{4})$/($1) $2-$3/;
+	$phone =~ s/^(\d{3})(\d{4})$/$1-$2/; # no AC
+
+	# Country code extension
+	my $cc = $r->[B_CC];
+	if ($cc eq "US") {
+	    $cc = "USA";
+	}
+	if ($cc eq "AU") {
+	    $cc = "Australia";
+	}
+
+	print "Phone:$phone\n";
+	$ordertonames{$r->[ORDER_NUMBER]} = "\n\n".$fullname."\\newline\n".$r->[B_ADDR12]."\\newline\n".$r->[B_CITY].",".$r->[B_STATE]." ".$r->[B_ZIPCODE]."\\newline\n".$phone."\\newline\n".$cc."\\newline\n";
 
 	$orderdetails{$r->[ORDER_NUMBER]} = " received on ".$r->[ORDER_DATE];
 	$discountamounts{$r->[ORDER_NUMBER]} = $r->[CART_DISCOUNT_AMOUNT];
 	$totalitemcounts{$r->[ORDER_NUMBER]} = $r->[TOTAL_ITEMS];
 	$totalpaid{$r->[ORDER_NUMBER]} = $r->[ORDER_TOTAL_AMOUNT];
+	$phonecontacts{$r->[ORDER_NUMBER]} = $phone;
+	$shortnames{$r->[ORDER_NUMBER]} = $fullname;
     }
 
     # Banquet Dinner
@@ -194,7 +227,7 @@ for my $r (@rows) {
 #	}
 	
 	
-	if ($r->[ORDER_STATUS] ne "Refunded") {
+	if (($r->[ORDER_STATUS] ne "Refunded") && ($r->[ORDER_STATUS] ne "Cancelled")) {
 	    $dinner_count = $dinner_count +1;
 	    $dinner_funds = $dinner_funds + $r->[ITEM_COST];
 	    $banquetdinners{$r->[ORDER_NUMBER]} .= " \\item Quantity ".$r->[QUANTITY]." Banquet Dinners (\\\$".$r->[ITEM_COST]." each) \n\\begin{itemize}\n \\item ".$x ."\n\\end{itemize}\n";
@@ -220,7 +253,7 @@ for my $r (@rows) {
 # unless grep{$_ == $r->[B_EMAIL]} @multiregistrationlist;
 	}
 	
-	if ($r->[ORDER_STATUS] ne "Refunded") {
+	if (($r->[ORDER_STATUS] ne "Refunded") && ($r->[ORDER_STATUS] ne "Cancelled")) {
 	    $registration_count = $registration_count +1;
 	    $registration_funds = $registration_funds + $r->[ITEM_COST];
 	    if ($r->[DISCOUNT_AMOUNT] ne "") { 
@@ -244,7 +277,7 @@ for my $r (@rows) {
 	print "\t", $r->[SKU], " ", $r->[NAME],"\n\t", $r->[VARIATION],"\n";
 	print "\tQty:", $r->[QUANTITY], ", total price:", $r->[ITEM_COST], "\n";;
 
-	if ($r->[ORDER_STATUS] ne "Refunded") {
+	if (($r->[ORDER_STATUS] ne "Refunded") && ($r->[ORDER_STATUS] ne "Cancelled")) {
 	    $tshirt_count = $tshirt_count + $r->[QUANTITY];
 	    $tshirt_funds = $tshirt_funds + $r->[ITEM_COST];
 
@@ -284,7 +317,7 @@ for my $r (@rows) {
 	print "\t", $r->[B_FIRSTNAME]," ", $r->[B_LASTNAME],"\n";
 	print "\t", $r->[SKU], " ", $r->[NAME],"\n\t", $r->[VARIATION],"\n";
 	print "\tQty:", $r->[QUANTITY], ", total price:", $r->[ITEM_COST], "\n";;
-	if ($r->[ORDER_STATUS] ne "Refunded") {
+    if (($r->[ORDER_STATUS] ne "Refunded") && ($r->[ORDER_STATUS] ne "Cancelled")) {
 	    $sticker_count = $sticker_count +1;
 	    $sticker_funds = $sticker_funds + $r->[ITEM_COST];
 	    $stickerorders{$r->[ORDER_NUMBER]} = "Quantity ".$r->[QUANTITY]." Stickers (\\\$".$r->[ITEM_COST]." each) - Theme: LDRS-1".$r->[VARIATION];
@@ -360,24 +393,23 @@ print "\$", ($net_funds - ($harris_fees + 3000 - $dinner_funds)), " TOTAL PROFIT
 
 print "\n\nDuplicate Registrations: @multiregistrationlist\n"; 
 
-# Print all dinners by ID
-# Now generate a PDF file with each order, one per page, with data listing
 
+# Output Order file for printing
 open(TEXFILE, ">./$TOPDIR/orders.tex") or die $!;
-
 # Document setup
 print TEXFILE "\\documentclass[letterpaper, 11pt]{article}\n";
 print TEXFILE "\\usepackage{amsmath}\n";
 print TEXFILE "\\usepackage{graphicx}\n";
 print TEXFILE "\\usepackage[scaled]{helvet}\n";
+#print TEXFILE "\\usepackage{showframe}\n";
 print TEXFILE "\\renewcommand\\familydefault{\\sfdefault}\n";
 print TEXFILE "\\usepackage[T1]{fontenc}\n";
 print TEXFILE "\\usepackage{color}\n";
 print TEXFILE "\\pagenumbering{gobble}\n\n";
 print TEXFILE "\\begin{document}\n";
 
+# Output Banquet tickets when we process orders where a dinner order was made
 open(TEXFILE2, ">./$TOPDIR/banquet-tickets.tex") or die $!;
-
 # Document setup
 print TEXFILE2 "\\documentclass[letterpaper, 11pt]{article}\n";
 print TEXFILE2 "\\usepackage{amsmath}\n";
@@ -389,7 +421,8 @@ print TEXFILE2 "\\usepackage{color}\n";
 print TEXFILE2 "\\pagenumbering{gobble}\n\n";
 print TEXFILE2 "\\begin{document}\n";
 
-
+# Now go through each logged order ID and generate
+# the output .tex files
 foreach my $id(sort keys %registrations) {
     my $dinner = $banquetdinners{$id};
     my $reg = $registrations{$id};
@@ -400,7 +433,11 @@ foreach my $id(sort keys %registrations) {
     my $items = $totalitemcounts{$id};
     my $total = $totalpaid{$id};
     my $details = $orderdetails{$id};
+    my $phone = $phonecontacts{$id};
+    my $shortname = $shortnames{$id};
+
     # Image header
+#    print TEXFILE "\\makebox[\\textwidth]{\\includegraphics{images/tcc_tra_1.png}}\n";
     print TEXFILE "\\begin{center}\n";
     print TEXFILE "\\makebox[\\textwidth]{\\includegraphics[width=\\textwidth]{images/LDRS37-c.png}}\n";
     print TEXFILE "\\end{center}\n";
@@ -408,6 +445,8 @@ foreach my $id(sort keys %registrations) {
     print TEXFILE "$name\n";
 
     print " Order# $id\n";
+
+    print TEXFILE "\\section\* {Itemized Listing} \\label{sec:Itemized Listing}\n";    
     print TEXFILE "\\begin{itemize}\n";
     
     if ($dinner) { 
@@ -415,10 +454,11 @@ foreach my $id(sort keys %registrations) {
     	# Dinners - Only output dinner information if there is an order for one
 #	print TEXFILE2 "\\pagecolor{green}\n\\color{white}\n";
 	print TEXFILE2 "\\begin{center}\n";
-	print TEXFILE2 "\\makebox[\\textwidth]{\\includegraphics[width=\\textwidth]{images/LDRS37-c.png}}\n";
+	print TEXFILE2 "\\makebox[\\textwidth]{\\includegraphics[width=\\textwidth]{images/harris_1937.png}}\n";
 	print TEXFILE2 "\\end{center}\n";
 	print TEXFILE2 "\\section\* {LDRS37 Banquet Dinner Ticket $id } \\label{sec:LDRS37 Banquet Dinner Ticket $id }\n";
-	print TEXFILE2 "$name\n";
+
+	print TEXFILE2 "\\#$id $shortname \\: $phone\n";
 	print TEXFILE2 "\\begin{itemize}\n";
 	print TEXFILE2 "$dinner\n";	
 	print TEXFILE2 "\\end{itemize}\n";
