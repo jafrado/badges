@@ -1,6 +1,6 @@
 # badges
 
-Event Badge Generator
+Event Badge Generator, Order Processor
 
 # We Don't Need no Stinking Badges!
 
@@ -112,7 +112,10 @@ from within the badges directory:
      \) -alpha off -compose CopyOpacity -composite  $i
  end
 
+# Order Processor
 
+WooCommerce Orders exported as CSV will be used to autogenerate the PDF for Banquet dinners and everything ordered
+from the site.
 	
 # Future Directions
 
