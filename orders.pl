@@ -16,6 +16,8 @@ use Text::CSV;
 use LWP::Simple;
 use utf8;
 
+sub  trim { my $s = shift; $s =~ s/^\s+|\s+$//g; return $s };
+
 # Format of Datafile
 #
 #"Order Number","Order Status","Order Date","Customer Note","First Name (Billing)","Last Name (Billing)","Company (Billing)","Address 1&2 (Billing)","City (Billing)","State Code (Billing)","Postcode (Billing)","Country Code (Billing)","Email (Billing)","Phone (Billing)","First Name (Shipping)","Last Name (Shipping)","Address 1&2 (Shipping)","City (Shipping)","State Code (Shipping)","Postcode (Shipping)","Country Code (Shipping)","Item #",SKU,Name,"Product Variation",Quantity,"Quantity (- Refund)","Item Cost","Order Line (w/o tax)","Order Line Tax","Order Line Total","Order Line Total Refunded","Order Line Total (- Refund)","Image URL","Coupon Code","Discount Amount","Discount Amount Tax","Payment Method Title","Coupons Used","Cart Discount Amount","Order Subtotal Amount","Order Tax Amount","Order Shipping Amount","Order Refund Amount","Order Total Amount","Order Total Tax Amount","Total items","Total products"
@@ -71,8 +73,9 @@ use constant ORDER_TOTAL_TAX_AMOUNT => 45;
 use constant TOTAL_ITEMS => 46;
 use constant TOTAL_PRODUCTS => 47;
 
-
 my $dinner_count = 0;
+my $bb_dinner_count = 0;
+my $bb_dinner_funds = 0;
 my $dinner_funds = 0;
 my $registration_count = 0;
 my $registration_funds = 0;
@@ -96,11 +99,31 @@ my $tshirt_2xl = 0;
 my $tshirt_3xl = 0;
 my $tshirt_4xl = 0;
 
+my $dc_steak = 0;
+my $dc_chicken = 0;
+my $dc_vegetarian = 0;
+my $dc_d_shortcake = 0;
+my $dc_d_mousse = 0;
+my $dc_t_mushrooms = 0;
+my $dc_t_bearnaise = 0;
+my $dc_t_barbeque = 0;
+my $dc_t_merlot = 0;
+my $dc_t_picatta = 0;
+my $dc_t_lemon_herb = 0;
+my $dc_t_marsala = 0;
+my $dc_t_bleu_glaciage = 0;
+my $dc_t_butter = 0;
+my $dc_t_alfredo = 0;
+my $dc_t_none = 0;
+my $dc_t_port_wine = 0;
+my $dc_sd_ranch = 0;
+my $dc_sd_vinaigrette = 0;
 
 my @multiregistrationlist;
 my @orderlist;
+my @emailinfo;
 
-# Order hashes, for each order, we use 3 associative arrays indexed by order #
+# Order hashes, for each order, we use associative arrays indexed by order #
 # tshirts, registrations, banquets, stickers
 # This way we can group all orders together
 my %tshirtorders = ();
@@ -114,6 +137,7 @@ my %totalitemcounts = ();
 my %totalpaid = ();
 my %phonecontacts = ();
 my %shortnames = ();
+my %blackrockbistroitems = ();
 
 # Top-level directory where images will be dumped
 my $TOPDIR = "orders/";
@@ -124,6 +148,11 @@ my $csv = Text::CSV->new ({
     auto_diag => 1, # Report irregularities immediately
 });
 
+# Output CSV file of all dinners and their selection
+open(BANQUETDINNERFILE, ">./$TOPDIR/banquetdinners.csv") or die $!;
+print BANQUETDINNERFILE "OrderID, First-Name,Last-Name,Email,Phone,Quantity,Main-Course,Sauce,Salad-Dressing,Dessert\n";
+open(BANQUETDINNERFILE2, ">./$TOPDIR/harrisdinners.csv") or die $!;
+print BANQUETDINNERFILE2 "OrderID,Quantity,Main-Course,Sauce,Salad-Dressing,Dessert\n";
 
 # Need filename on command line
 my $file = $ARGV[0] or die "usage: [file] Class\nerror:no CSV filename provided on the command line\n";
@@ -199,6 +228,9 @@ for my $r (@rows) {
 	$totalpaid{$r->[ORDER_NUMBER]} = $r->[ORDER_TOTAL_AMOUNT];
 	$phonecontacts{$r->[ORDER_NUMBER]} = $phone;
 	$shortnames{$r->[ORDER_NUMBER]} = $fullname;
+       
+	push (@emailinfo, $r->[B_EMAIL].",".$fullname) unless grep{$_ eq $r->[B_EMAIL].",".$fullname } @emailinfo;	
+
     }
 
     # Banquet Dinner
@@ -209,11 +241,14 @@ for my $r (@rows) {
 	print "\t", $r->[B_FIRSTNAME]," ", $r->[B_LASTNAME],"\n";
 	print "\t", $r->[SKU], " ", $r->[NAME],"\n\t";
 #, $r->[VARIATION],"\n";
-	print "\tQty:", $r->[QUANTITY], ", total price:", $r->[ITEM_COST], "\n";;
+	print "\tQty:", $r->[QUANTITY], ", total price:", $r->[ITEM_COST], "\n";
 
 	my $x = $r->[VARIATION];
 	$x =~ s/\x{00E9}/e/g; # Remove special character e apostrophe
-
+	my $yy = $x;
+	my $str3_pat = quotemeta('|');
+	my $str3_rep = ',';
+	$yy =~ s/$str3_pat/$str3_rep/g;
 
 	my @dinneritem = split  '|', $x;
 	print @dinneritem;
@@ -221,14 +256,123 @@ for my $r (@rows) {
 	my $str2_pat = quotemeta('|');
 	my $str2_rep = '\item';
 	$x =~ s/$str2_pat/$str2_rep/g;
-	
+
 #	for my $menuitem ( @dinneritem ) {
 #	    print "$menuitem\n";
 #	}
+
+	# Make a Csv file with all orders
+	my $n;
+	my $v;
+	# For internal use
+	my $ph = $r->[B_PHONE];
+	my $fn = lc($r->[B_FIRSTNAME]);
+	my $ln = lc($r->[B_LASTNAME]);
+	$fn =~ s/(\w+)/\u$1/g;	
+	$ln =~ s/(\w+)/\u$1/g;
+
+	# Thanks Zaxo - http://www.perlmonks.org/bare/?node_id=259986
+	# convert alpha mnemonics
+	$ph =~ tr/A-PR-Z/222333444555666777888999/;
+	$ph =~ tr/a-pr-z/222333444555666777888999/;    
+	# get rid of any nondigits
+	$ph =~ s/\D//g;    
+	# format
+	$ph =~ s/^(\d{3})(\d{3})(\d{4})$/($1) $2-$3/;
+	$ph =~ s/^(\d{3})(\d{4})$/$1-$2/; # no AC
+
 	
+	my $din_string = $r->[ORDER_NUMBER].",".$fn.",". $ln.",".$r->[B_EMAIL].",".$ph.",".$r->[QUANTITY];
+	# For harris use
+	my $din_string2 = $r->[ORDER_NUMBER].",".$r->[QUANTITY];
+	
+	my @dinneritem2 = split ',',$yy;	
+	foreach my $k (@dinneritem2) {
+	    ($n, $v) = split (':', $k);
+	    $v =~ s/^\s+|\s+$//g;
+	    if ( $v !~ /\s/ ) {
+	    }
+	    else {
+		$v = "\"".$v."\"";
+	    }
+	    $din_string .= ",".$v;
+	    $din_string2 .= ",".$v;	    
+	}
+	# Count up Totals
+	my $dinner_selection = $r->[VARIATION];
+	if ($dinner_selection ne "") {
+	    
+	    if ($dinner_selection =~ / Steak/) {
+		$dc_steak += $r->[QUANTITY];		
+	    }
+	    if ($dinner_selection =~ / Chicken/) {
+		$dc_chicken += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / Vegetarian/) {
+		$dc_vegetarian += $r->[QUANTITY];
+	    }
+
+	    if ($dinner_selection =~ / Strawberry/) {
+		$dc_d_shortcake += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / Chocolate/) {
+		$dc_d_mousse += $r->[QUANTITY];
+	    }
+
+	    if ($dinner_selection =~ / Mushrooms/) {
+		$dc_t_mushrooms += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ /naise/) {
+		$dc_t_bearnaise += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / Barbecue/) {
+		$dc_t_barbeque += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / Merlot/) {
+		$dc_t_merlot += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / Picatta/) {
+		$dc_t_picatta += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / Lemon/) {
+		$dc_t_lemon_herb += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / Marsala/) {
+		$dc_t_marsala += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / Glaciage/) {
+		$dc_t_bleu_glaciage += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / Butter/) {
+		$dc_t_butter += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / Alfredo/) {
+		$dc_t_alfredo += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / Marsala/) {
+		$dc_t_marsala += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / None/) {
+		$dc_t_none += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / Port/) {
+		$dc_t_port_wine += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / Vinaigrette/) {
+		$dc_sd_vinaigrette += $r->[QUANTITY];
+	    }
+	    if ($dinner_selection =~ / Ranch/) {
+		$dc_sd_ranch += $r->[QUANTITY];
+	    }
+	
+	}
+	#	print "\n$v";
+	#	print "Dinner:", $din_string, "\n";
+	print BANQUETDINNERFILE $din_string,"\n";
+	print BANQUETDINNERFILE2 $din_string2,"\n";	
 	
 	if (($r->[ORDER_STATUS] ne "Refunded") && ($r->[ORDER_STATUS] ne "Cancelled")) {
-	    $dinner_count = $dinner_count +1;
+	    $dinner_count = $dinner_count +$r->[QUANTITY];
 	    $dinner_funds = $dinner_funds + $r->[ITEM_COST];
 	    $banquetdinners{$r->[ORDER_NUMBER]} .= " \\item Quantity ".$r->[QUANTITY]." Banquet Dinners (\\\$".$r->[ITEM_COST]." each) \n\\begin{itemize}\n \\item ".$x ."\n\\end{itemize}\n";
 	}
@@ -238,7 +382,16 @@ for my $r (@rows) {
 	}
 
     }
+    # Blackrock Bistro Dinner
+    if ($r->[NAME] =~ /Black Rock Bistro/) {
+	if (($r->[ORDER_STATUS] ne "Refunded") && ($r->[ORDER_STATUS] ne "Cancelled")) {
+	    $bb_dinner_count += $r->[QUANTITY];
+	    $bb_dinner_funds += $r->[QUANTITY] * (15.00 - 0.74);
+	    $blackrockbistroitems{$r->[ORDER_NUMBER]} = "Quantity ".$r->[QUANTITY]." Italian Dinners (\\\$".$r->[ITEM_COST]." each) - ".$r->[B_FIRSTNAME]." ".$r->[B_LASTNAME];
 
+	}
+    }
+    
     # Registration
     if ($r->[NAME] eq "LDRS37 Registration") { 
     
@@ -311,20 +464,171 @@ for my $r (@rows) {
 
     # Sticker
     if ($r->[NAME] =~ /ticker/) { 
-    
 	# Show each record field
 	print "Order: #", $r->[ORDER_NUMBER]," ", $r->[ORDER_STATUS], " on ", $r->[ORDER_DATE], "\n";
 	print "\t", $r->[B_FIRSTNAME]," ", $r->[B_LASTNAME],"\n";
 	print "\t", $r->[SKU], " ", $r->[NAME],"\n\t", $r->[VARIATION],"\n";
 	print "\tQty:", $r->[QUANTITY], ", total price:", $r->[ITEM_COST], "\n";;
     if (($r->[ORDER_STATUS] ne "Refunded") && ($r->[ORDER_STATUS] ne "Cancelled")) {
-	    $sticker_count = $sticker_count +1;
-	    $sticker_funds = $sticker_funds + $r->[ITEM_COST];
+	    $sticker_count = $sticker_count +$r->[QUANTITY];
+	    $sticker_funds = $sticker_funds + $r->[ITEM_COST] * $r->[QUANTITY];
 	    $stickerorders{$r->[ORDER_NUMBER]} = "Quantity ".$r->[QUANTITY]." Stickers (\\\$".$r->[ITEM_COST]." each) - Theme: LDRS-1".$r->[VARIATION];
 	}
     }
     
 }
+close BANQUETDINNERFILE;
+close BANQUETDINNERFILE2;
+
+# Output Order file for printing
+open(TEXFILE, ">./$TOPDIR/orders.tex") or die $!;
+# Document setup
+print TEXFILE "\\documentclass[letterpaper, 11pt]{article}\n";
+print TEXFILE "\\usepackage{amsmath}\n";
+print TEXFILE "\\usepackage{graphicx}\n";
+print TEXFILE "\\usepackage[scaled]{helvet}\n";
+#print TEXFILE "\\usepackage{showframe}\n";
+print TEXFILE "\\renewcommand\\familydefault{\\sfdefault}\n";
+print TEXFILE "\\usepackage[T1]{fontenc}\n";
+print TEXFILE "\\usepackage{color}\n";
+print TEXFILE "\\pagenumbering{gobble}\n\n";
+print TEXFILE "\\begin{document}\n";
+
+# Output Banquet tickets when we process orders where a dinner order was made
+open(TEXFILE2, ">./$TOPDIR/banquet-tickets.tex") or die $!;
+# Document setup
+print TEXFILE2 "\\documentclass[letterpaper, 11pt]{article}\n";
+print TEXFILE2 "\\usepackage{amsmath}\n";
+print TEXFILE2 "\\usepackage{graphicx}\n";
+print TEXFILE2 "\\usepackage[scaled]{helvet}\n";
+print TEXFILE2 "\\renewcommand\\familydefault{\\sfdefault}\n";
+print TEXFILE2 "\\usepackage[T1]{fontenc}\n";
+print TEXFILE2 "\\usepackage{color}\n";
+print TEXFILE2 "\\pagenumbering{gobble}\n\n";
+print TEXFILE2 "\\begin{document}\n";
+
+
+# Output Black Rock Bistro Italian Dinner tickets
+open(TEXFILE3, ">./$TOPDIR/bistro-dinners.tex") or die $!;
+# Document setup
+print TEXFILE3 "\\documentclass[letterpaper, 11pt]{article}\n";
+print TEXFILE3 "\\usepackage{amsmath}\n";
+print TEXFILE3 "\\usepackage{graphicx}\n";
+print TEXFILE3 "\\usepackage[scaled]{helvet}\n";
+print TEXFILE3 "\\renewcommand\\familydefault{\\sfdefault}\n";
+print TEXFILE3 "\\usepackage[T1]{fontenc}\n";
+print TEXFILE3 "\\usepackage{color}\n";
+print TEXFILE3 "\\pagenumbering{gobble}\n\n";
+print TEXFILE3 "\\begin{document}\n";
+
+
+
+# Now go through each logged order ID and generate
+# the output .tex files
+#foreach my $id(sort keys %registrations) {
+foreach my $id(@orderlist) {
+    my $dinner = $banquetdinners{$id};
+    my $reg = $registrations{$id};
+    my $shirts = $tshirtorders{$id};
+    my $stickers = $stickerorders{$id};
+    my $name = $ordertonames{$id};
+    my $discounts = $discountamounts{$id};
+    my $items = $totalitemcounts{$id};
+    my $total = $totalpaid{$id};
+    my $details = $orderdetails{$id};
+    my $phone = $phonecontacts{$id};
+    my $shortname = $shortnames{$id};
+    my $bb_dinner = $blackrockbistroitems{$id};
+    
+    # Image header
+#    print TEXFILE "\\makebox[\\textwidth]{\\includegraphics{images/tcc_tra_1.png}}\n";
+    print TEXFILE "\\begin{center}\n";
+    print TEXFILE "\\makebox[\\textwidth]{\\includegraphics[width=\\textwidth]{images/LDRS37-c.png}}\n";
+    print TEXFILE "\\end{center}\n";
+    print TEXFILE "\\section\* {Order $id $details} \\label{sec:Order $id $details}\n";
+    print TEXFILE "$name\n";
+
+    print " Order# $id\n";
+
+    print TEXFILE "\\section\* {Itemized Listing} \\label{sec:Itemized Listing}\n";    
+    print TEXFILE "\\begin{itemize}\n";
+    
+    if ($dinner) { 
+	print TEXFILE "$dinner\n";
+    	# Dinners - Only output dinner information if there is an order for one
+#	print TEXFILE2 "\\pagecolor{green}\n\\color{white}\n";
+	print TEXFILE2 "\\begin{center}\n";
+	print TEXFILE2 "\\makebox[\\textwidth]{\\includegraphics[width=\\textwidth]{images/harris_1937.png}}\n";
+	print TEXFILE2 "\\end{center}\n";
+	print TEXFILE2 "\\section\* {LDRS37 Banquet Dinner Ticket $id } \\label{sec:LDRS37 Banquet Dinner Ticket $id }\n";
+
+	print TEXFILE2 "\\#$id $shortname \\: $phone\n";
+	print TEXFILE2 "\\begin{itemize}\n";
+	print TEXFILE2 "$dinner\n";	
+	print TEXFILE2 "\\end{itemize}\n";
+	print TEXFILE2 "\\pagebreak\n";	
+    }
+    if ($bb_dinner) {
+	print TEXFILE "\\item $bb_dinner\n";	
+
+	# Italian Dinners - only output dinner info if there is an order for one
+	print TEXFILE3 "\\begin{center}\n";
+	print TEXFILE3 "\\makebox[\\textwidth]{\\includegraphics[width=\\textwidth]{images/Blackrock-bistro-1080p.png}}\n";
+	print TEXFILE3 "\\end{center}\n";
+	print TEXFILE3 "\\section\* {Black Rock Bistro Italian Dinner Ticket $id } \\label{sec:Black Rock Bistro Italian Dinner Ticket $id }\n";
+
+	print TEXFILE3 "\\#$id $shortname \\: $phone\n";
+	print TEXFILE3 "\\begin{itemize}\n";
+	print TEXFILE3 "\\item $bb_dinner\n";	
+	print TEXFILE3 "\\end{itemize}\n";
+	print TEXFILE3 "\\pagebreak\n";	
+    }
+    if ($reg) { 
+	print TEXFILE "\\item $reg\n";
+    }
+    if ($shirts) { 
+	print TEXFILE "\\item $shirts\n";
+    }
+    if ($stickers) { 
+	print TEXFILE "\\item $stickers\n";
+    }
+
+    print TEXFILE "\\end{itemize}\n";    
+
+    print TEXFILE "$items items ordered\n";
+    if ($discounts ne "0") {
+	print TEXFILE "\\newline Discounts:\\\$",$discounts,"\n";
+    }
+    print TEXFILE "\\newline Total: \\\$", $total, " - Paid online via PayPal\n";
+
+    print TEXFILE "\\pagebreak\n";
+}
+print TEXFILE "\\end{document}\n";
+print TEXFILE2 "\\end{document}\n";
+
+#output total for vendor
+print TEXFILE3 "\\pagebreak\n";
+print TEXFILE3 "Total dinners:", $bb_dinner_count, "\n";
+print TEXFILE3 "\\newline Total funds (Minus \\\$0.74\/each Paypal fees): \\\$", $bb_dinner_funds, " - Paid online via PayPal\n";
+print TEXFILE3 "\\end{document}\n";
+close TEXFILE;
+close TEXFILE2;
+close TEXFILE3;
+
+
+
+# Output Email Address list for Email Users plugin (to import)
+print "Outputting Email database ...\n";
+open(EMAILFILE, ">./$TOPDIR/emailusers.csv") or die $!;
+print EMAILFILE "Email,Name\n";
+foreach my $user (@emailinfo) {
+    print EMAILFILE $user."\n";
+}
+close EMAILFILE;
+
+
+
+
 
 $n_orders = scalar @orderlist;
 
@@ -356,10 +660,13 @@ print "\$", $net_funds, " available (minus Paypal costs)\n";
 print $dinner_count, " Banquet dinners\n";
 print "\t\$", $dinner_funds, " funded\n";
 
+print $bb_dinner_count, " Black Rock Bistro Saturday Night Italian dinners\n";
+print "\t\$", $bb_dinner_funds, " funded\n";
+
 print $registration_count, "  registrations\n";
 print "\t\$", $registration_funds, " funded\n";
-print "\t\$", $discounted_registrations, " total discounts (", $n_discounted_registrations, ")\n";
-$registration_funds = $registration_funds - $discounted_registrations;
+print "\t(\$", $discounted_registrations, ") total discounts (", $n_discounted_registrations, ")\n";
+#$registration_funds = $registration_funds - $discounted_registrations;
 print "\t\$", $registration_funds, " available\n";
 
 
@@ -368,125 +675,87 @@ print $tshirt_count, "  T-Shirts - S(", $tshirt_sm, "), M(", $tshirt_m, "), L(",
 print "\t\$", $tshirt_funds, " funded \n";
 #print "", ($tshirt_sm + $tshirt_m + $tshirt_l + $tshirt_xl + $tshirt_2xl + $tshirt_3xl + $tshirt_4xl), " total\n";
 
-
-
-
 print $sticker_count, "  Stickers\n";
 print "\t\$", $sticker_funds, " funded\n";
 
-
-
 my $harris_fees = 0;
 $harris_fees = 775 + $dinner_funds * 0.18 + $dinner_funds * 0.07975;
+print "\n======= Harris Banquet =========\n";
+print "Total meal obligations: \$", $dinner_funds, " (", $dinner_count, " total meals)\n";
+print "(\$", $harris_fees, ") Harris costs (Taxes and Board room)\n";
+$harris_fees = $harris_fees + $dinner_funds;
+print "(\$", $harris_fees, ") Total Harris costs\n";
+$harris_fees = $harris_fees - 1000;
+print "\$1000 Deposit - Mike Smith, Jan 2018 - TCC Credit/Reservation\n";
+print "(\$", $harris_fees, ") Total Harris costs\n";
 
-print "\$", $harris_fees, " Harris cost\n";
-
-print "Total meal obligations: \$3000\n";
 
 if ($dinner_funds < 3000) { 
     print "\t\$", (3000 - $dinner_funds), " more needed (", (3000 - $dinner_funds)/40, " meals)\n";
 }
+print "\n======= Launch Costs  =========\n";
+print "(\$191.50) - Range setup supplies (Paint, Yellow Tape)\n";
+$net_funds = $net_funds - 191.50;
+
+print "(\$378.00) - Stickers (LDRS, TCC, LDRS/TCC, Custom Wristbands)\n";
+$net_funds = $net_funds - 378.00;
+
+print "(\$223.88) - LDRS37 Rocket (Avalanche) x2 - Raffle Prizes\n";
+$net_funds = $net_funds - 223.88;
+print "(\$931.40)  - 80/20 Rails for all pads\n";
+$net_funds = $net_funds - 931.40;
+print "(\$307.80)  - New EZ-Up for TCC\n";
+$net_funds = $net_funds - 307.80 ;
+print "(\$307.80)  - 2nd New EZ-Up for TCC\n";
+$net_funds = $net_funds - 307.80 ;
+print "(\$3076.79) - T-Shirts & Hats - 200:14S,16M,54L,72XL,28XL2,12XL3,4XL4,50Caps\n";
+$net_funds = $net_funds - 3096.79;
+print "(\$120.51)  - EZ-Up Banners\n";
+$net_funds = $net_funds - 120.51;
+print "(\$323.01)  - Badges\n";
+$net_funds = $net_funds - 323.01;
+print "(\$500.00)  - Bags and Lanyards\n";
+$net_funds = $net_funds - 500.00;
+print "(\$268.90)  - Lapel Pins - Certification (x100)\n";
+$net_funds = $net_funds - 268.90;
+
+print "(\$143.97)  - ABC Fire Extinguishers (x3)\n";
+$net_funds = $net_funds - 143.97;
+
+print "(\$627.44)  - Black Rock Bistro Funds\n";
+$net_funds = $net_funds - 627.44;
 
 
-print "\$", ($net_funds - ($harris_fees + 3000 - $dinner_funds)), " TOTAL PROFIT (TCC Covers remaining Meal obligations)\n";
+print "\+\$700.00  - TRA Pays for Conference rooms\n";
+$net_funds = $net_funds + 700.00;
+
+print "\n=======================\n";
+
+print "\$", ($net_funds - $harris_fees), " TOTAL PROFIT (TCC Covers Taxes/Setup & Board Rooms at Harris)\n";
 
 
 print "\n\nDuplicate Registrations: @multiregistrationlist\n"; 
 
+print "\nHarris Ranch Dinners\n";
+print   "====================\n";
+print "\tMain courses: Steak\(",$dc_steak,"\) Chicken\(",$dc_chicken,"\) Vegetarian\(",$dc_vegetarian,"\)\n";
+print "\tDesserts: Strawberry Shortcake\(", $dc_d_shortcake, "\) Chocolate Mousse\(", $dc_d_mousse, "\)\n";
+print "\tSauces\n";
+print "\t======\n";
+print "\tSauteed Mushrooms:", $dc_t_mushrooms,"\n";
+print "\tBearnaise Sauce:", $dc_t_bearnaise,"\n";
+print "\tBarbeque Sauce:", $dc_t_barbeque,"\n";
+print "\tMerlot Sauce:", $dc_t_merlot,"\n";
+print "\tPicatta Sauce:", $dc_t_picatta,"\n";
+print "\tLemon Herb:", $dc_t_picatta,"\n";
+print "\tMarsala Sauce:", $dc_t_marsala,"\n";
+print "\tBleu Cheese Glaciage:", $dc_t_bleu_glaciage,"\n";
+print "\tButter:", $dc_t_butter,"\n";
+print "\tAlfredo:", $dc_t_alfredo,"\n";
+print "\tMarsala:", $dc_t_marsala,"\n";
+print "\tPort Wine:", $dc_t_port_wine,"\n";
+print "\tNone:", $dc_t_none,"\n";
+print "Salad Dressings: Ranch\(", $dc_sd_ranch, "\) Basil Vinaigrette\(", $dc_sd_vinaigrette, "\)\n";
 
-# Output Order file for printing
-open(TEXFILE, ">./$TOPDIR/orders.tex") or die $!;
-# Document setup
-print TEXFILE "\\documentclass[letterpaper, 11pt]{article}\n";
-print TEXFILE "\\usepackage{amsmath}\n";
-print TEXFILE "\\usepackage{graphicx}\n";
-print TEXFILE "\\usepackage[scaled]{helvet}\n";
-#print TEXFILE "\\usepackage{showframe}\n";
-print TEXFILE "\\renewcommand\\familydefault{\\sfdefault}\n";
-print TEXFILE "\\usepackage[T1]{fontenc}\n";
-print TEXFILE "\\usepackage{color}\n";
-print TEXFILE "\\pagenumbering{gobble}\n\n";
-print TEXFILE "\\begin{document}\n";
 
-# Output Banquet tickets when we process orders where a dinner order was made
-open(TEXFILE2, ">./$TOPDIR/banquet-tickets.tex") or die $!;
-# Document setup
-print TEXFILE2 "\\documentclass[letterpaper, 11pt]{article}\n";
-print TEXFILE2 "\\usepackage{amsmath}\n";
-print TEXFILE2 "\\usepackage{graphicx}\n";
-print TEXFILE2 "\\usepackage[scaled]{helvet}\n";
-print TEXFILE2 "\\renewcommand\\familydefault{\\sfdefault}\n";
-print TEXFILE2 "\\usepackage[T1]{fontenc}\n";
-print TEXFILE2 "\\usepackage{color}\n";
-print TEXFILE2 "\\pagenumbering{gobble}\n\n";
-print TEXFILE2 "\\begin{document}\n";
-
-# Now go through each logged order ID and generate
-# the output .tex files
-foreach my $id(sort keys %registrations) {
-    my $dinner = $banquetdinners{$id};
-    my $reg = $registrations{$id};
-    my $shirts = $tshirtorders{$id};
-    my $stickers = $stickerorders{$id};
-    my $name = $ordertonames{$id};
-    my $discounts = $discountamounts{$id};
-    my $items = $totalitemcounts{$id};
-    my $total = $totalpaid{$id};
-    my $details = $orderdetails{$id};
-    my $phone = $phonecontacts{$id};
-    my $shortname = $shortnames{$id};
-
-    # Image header
-#    print TEXFILE "\\makebox[\\textwidth]{\\includegraphics{images/tcc_tra_1.png}}\n";
-    print TEXFILE "\\begin{center}\n";
-    print TEXFILE "\\makebox[\\textwidth]{\\includegraphics[width=\\textwidth]{images/LDRS37-c.png}}\n";
-    print TEXFILE "\\end{center}\n";
-    print TEXFILE "\\section\* {Order $id $details} \\label{sec:Order $id $details}\n";
-    print TEXFILE "$name\n";
-
-    print " Order# $id\n";
-
-    print TEXFILE "\\section\* {Itemized Listing} \\label{sec:Itemized Listing}\n";    
-    print TEXFILE "\\begin{itemize}\n";
-    
-    if ($dinner) { 
-	print TEXFILE "$dinner\n";
-    	# Dinners - Only output dinner information if there is an order for one
-#	print TEXFILE2 "\\pagecolor{green}\n\\color{white}\n";
-	print TEXFILE2 "\\begin{center}\n";
-	print TEXFILE2 "\\makebox[\\textwidth]{\\includegraphics[width=\\textwidth]{images/harris_1937.png}}\n";
-	print TEXFILE2 "\\end{center}\n";
-	print TEXFILE2 "\\section\* {LDRS37 Banquet Dinner Ticket $id } \\label{sec:LDRS37 Banquet Dinner Ticket $id }\n";
-
-	print TEXFILE2 "\\#$id $shortname \\: $phone\n";
-	print TEXFILE2 "\\begin{itemize}\n";
-	print TEXFILE2 "$dinner\n";	
-	print TEXFILE2 "\\end{itemize}\n";
-	print TEXFILE2 "\\pagebreak\n";	
-    }
-    if ($reg) { 
-	print TEXFILE "\\item $reg\n";
-    }
-    if ($shirts) { 
-	print TEXFILE "\\item $shirts\n";
-    }
-    if ($stickers) { 
-	print TEXFILE "\\item $stickers\n";
-    }
-
-    print TEXFILE "\\end{itemize}\n";    
-
-    print TEXFILE "$items items ordered\n";
-    if ($discounts ne "0") {
-	print TEXFILE "\\newline Discounts:\\\$",$discounts,"\n";
-    }
-    print TEXFILE "\\newline Total: \\\$", $total, " - Paid online via PayPal\n";
-
-    print TEXFILE "\\pagebreak\n";
-}
-print TEXFILE "\\end{document}\n";
-print TEXFILE2 "\\end{document}\n";
-
-close TEXFILE;
-close TEXFILE2;
 

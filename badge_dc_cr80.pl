@@ -17,7 +17,6 @@ use Image::Magick;
 use CGI qw(escapeHTML);
 use URI::Find;
 use Scalar::Util qw(looks_like_number);
-use Imager::QRCode;
 use GD::Barcode;
 use GD::Barcode::UPCA;
 use Data::GUID;
@@ -42,7 +41,7 @@ use constant CLEVEL  => 7;
 use constant SIGNATURE => 8;
 
 # Top-level directory where images will be dumped
-my $TOPDIR = "badges-ticket-printing/";
+my $TOPDIR = "badges-duracard/";
 
 # CSV Parser instance
 my $csv = Text::CSV->new ({
@@ -74,14 +73,19 @@ while (my $row = $csv->getline($data)) {
 # Ticketprinting.com has 3 types of badges
 # For this program, we are using the SMALL VIP EVENT BADGE: 4.1" X 2.7"
 
+# Duracard Hanger Template - 2100 x 3375 includes
+# Hanger: 3 3/8" x 3 3/8" (3 1/2" x 3 7/16" Total with 1/8" bleed area)
+# Credit Card Size (CR80): 3 3/8" x 2 1/8" (3 1/2" x 2 1/4" total with bleed)
+
 # Input inches for bwi (badge width in inches)
-my $bwi = 2.7;
+my $bwi = 3.5;
 
 # Input inches for bhi (badge height in inches)
-my $bhi = 4.1; 
+my $bhi = 2.25; 
 
 # Specify printable dpi
-my $dpi = 300;
+# Duracard wants 600 DPI
+my $dpi = 600;
 
 # Compute badge width/height in Centimeters
 # NOTE: 1 dpi = 0.393701 pixel/cm; 1 pixel/cm = 2.54 dpi
@@ -127,10 +131,7 @@ my $idcode = 0;
 
 # font point size and pitch (pixel offset for line of text rendered @ ps
 my $ps = 42;
-my $font_step = 52;
-
-# QR Code object
-use Imager::QRCode;
+my $font_step = 42;
 
 
 # Process each CSV line record
@@ -145,27 +146,34 @@ for my $r (@rows) {
 
     # Compute Cert Level (e.g. 0, 1, 2, 3)
     # Setup Font/Fill Colors to Draw bottom half of badge
-    if (length $r->[CLEVEL] >= 7 ) { 
+    if (length $r->[CLEVEL] >= 7 ) {
+	
 	$cert_level = substr($r->[CLEVEL], 6, 6);
 	if (($cert_level eq "1") || ($cert_level eq "0")) {  
-	    $fg_color = 'LightSteelBlue';
+#	    $fg_color = 'LightSteelBlue';
 	    $font_color = 'black';
 	} 
 	if ($cert_level eq "2") { 
-	    $fg_color = 'yellow';
+#	    $fg_color = 'yellow';
 	    $font_color = 'black';
 	}
 	if ($cert_level eq "3") { 
-	    $fg_color = 'chartreuse';
+#	    $fg_color = 'chartreuse';
 	    $font_color = 'black';
 	}
+	if ( ($cert_level eq "0")) {
+	    $fg_color = 'red';	    
+	}
+	
     } else {
 	if ( ($r->[CLEVEL] eq "None") || ($r->[CLEVEL] eq "0") || ($r->[CLEVEL] eq "TMP") ) { 
 	    $cert_level = 0;
 	    $fg_color = 'red';
 	}
     }
-
+    if ( ($cert_level eq "")) {
+	$fg_color = 'red';	    
+    }
     # Show each record field
     print "ID: ", $r->[ID]," ", $r->[FNAME]," ", $r->[LNAME], " ", $r->[ORG], " #", $r->[IDNUM], " ", $cert_level, "\n";
 
@@ -179,7 +187,7 @@ for my $r (@rows) {
     warn "$x" if "$x";
 
     # Composite first Image - Website banner on top of badge
-    $image->Read('images/LDRS37-b.png');
+    $image->Read('images/LDRS37-8.png');
 
     # Scale Banner Image to width of badge
     $image->Resize(width=>$xa);
@@ -187,14 +195,20 @@ for my $r (@rows) {
     my $banner = $image->[1];
 
     # Composite Banner on main badge
-    $badge->Composite(image=>$banner);#, x=>0, y=>0, geometry=>$geometry, opacity=>50);
+    $badge->Composite(image=>$banner, x=>0, y=>0);#, x=>0, y=>0, geometry=>$geometry, opacity=>50);
 
     # Set initial step size
-    $font_step = 52;
+    $font_step = 50;
+    my $img_offset = 432;
 
+
+#    $image->Annotate(font=>'fonts/Sonicxb.ttf', 
+#		     x=>280, y=>300,
+#                     pointsize=>72, fill=>'black', text=>"LDRS XXXVII");
+    
     # Draw border area
     $badge->Draw(stroke=>'black', fill=>$fg_color, 
-		 primitive=>'rectangle', points=>'0,820,820,1230');
+		 primitive=>'rectangle', points=>'0,400,2100,2156');
 
     # LDRS ID is the Wordpress User ID minus 3 (to remove admin users)
     # NOTE: This implies all users start at 4 in your datafile ID field
@@ -209,7 +223,7 @@ for my $r (@rows) {
 	$text = "LDRS37-ID#";
     }
     $image->Annotate(font=>'fonts/Sonicxb.ttf', 
-		     x=>90, y=>(14*$font_step), 
+		     x=>220, y=>520,
                      pointsize=>38, fill=>'black', text=>$text);
 
    # Generate UUID
@@ -237,16 +251,13 @@ for my $r (@rows) {
     # Name: First Last
     $text = $r->[FNAME]." ".$r->[LNAME];
     $image->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
-		     x=>30, y=>(17*$font_step), pointsize=>$ps, 
+		     x=>200, y=>(5*$font_step + $img_offset), pointsize=>$ps, 
                      fill=>$font_color, text=>$text);
-
-    # add a little separation 
-    $font_step = 53;
 
     #  Organization and Membership number, Cert Level
     $text = $r->[ORG]." ".$r->[IDNUM];
     $image->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
-		     x=>30, y=>(18*$font_step), pointsize=>$ps, 
+		     x=>200, y=>(8*$font_step + $img_offset), pointsize=>$ps, 
                      fill=>$font_color, text=>$text);
 
     #$text = $." ".substr($r->[CLEVEL], 0, 1).substr($r->[CLEVEL], 6, 6);
@@ -257,7 +268,7 @@ for my $r (@rows) {
     }
     
     $image->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
-		     x=>30, y=>(19*$font_step+6), 
+		     x=>200, y=>(11*$font_step+6 + $img_offset), 
                      pointsize=>$ps, fill=>$font_color, text=>$text);
 
 
@@ -280,64 +291,36 @@ for my $r (@rows) {
     # END:VCARD
 
     # See also: http://www.evenx.com/vcard-3-0-format-specification
-    if ($r->[EMAIL] ne "") { 
-	my $vcard = "BEGIN:VCARD\n";
-	$vcard .="VERSION 4.0\n";
-	$vcard .= "N:".$r->[LNAME].";".$r->[FNAME]."\n";
-	$vcard .= "FN:".$r->[FNAME]." ".$r->[LNAME]."\n";
-	$vcard .= "ADR;TYPE=dom,home,postal,parcel:;;;;;; ";
-	# Todo: put link to users page on ldrs37.org
-	$vcard .= "URL:http://ldrs37.org/\n";
-	$vcard .= "ORG: LDRS37\n";
-	$vcard .= "EMAIL:".$r->[EMAIL]."\n";
-	if ($cert_level ne "") { 
-	    $vcard .= "NOTE: ".$r->[ORG]." ".$r->[IDNUM]." ".$cert_level." ".$r->[SIGNATURE]."\n";
-	}
-	$vcard .= "END:VCARD\n";
-	my $qrf = $TOPDIR."QR".$idcode.".png";
-	print "-----------------------\n",$vcard;
-	
-	
-	# Generate QR Code
-	Imager::QRCode->new->plot($vcard)->write(file => $qrf);
-	# Composite QR Code on image
-	$image->Read($qrf);
-	my $qrcode = $image->[2];
-	# Composite Banner on main badge todo:may need to adjust for different sizes
-	$badge->Composite(image=>$qrcode, x=>600, y=>620);
-	system "rm -f $qrf";
-    }
 
-   # Icon based on registered organization 
-   # only one may be registered for the event
-    if ($r->[ORG] eq "TRA") { 
-	$image->Read('images/tra.png');
-	my $orgicon = $image->[3];
-	$orgicon->Resize(width=>173, height=>75);
-	$badge->Composite(image=>$orgicon, x=>422, y=>716);
+    my $vcard = "BEGIN:VCARD\n";
+    $vcard .="VERSION 4.0\n";
+    $vcard .= "N:".$r->[LNAME].";".$r->[FNAME]."\n";
+    $vcard .= "FN:".$r->[FNAME]." ".$r->[LNAME]."\n";
+    $vcard .= "ADR;TYPE=dom,home,postal,parcel:;;;;;; ";
+    # Todo: put link to users page on ldrs37.org
+    $vcard .= "URL:http://ldrs37.org/\n";
+    $vcard .= "ORG: LDRS37\n";
+    $vcard .= "EMAIL:".$r->[EMAIL]."\n";
+    if ($cert_level ne "") { 
+	$vcard .= "NOTE: ".$r->[ORG]." ".$r->[IDNUM]." ".$cert_level." ".$r->[SIGNATURE]."\n";
     }
-    if ($r->[ORG] eq "NAR") { 
-        $image->Read('images/nar.png');
-	my $orgicon = $image->[3];
-        $orgicon->Resize(width=>87, height=>133);
-        $badge->Composite(image=>$orgicon, x=>10, y=>660);
-    }
+    $vcard .= "END:VCARD\n";
+    my $qrf = $TOPDIR."QR".$idcode.".png";
+    print "-----------------------\n",$vcard;
 
     # Flier unless Signature has additional field of Vendor/Staff indicator 
     # Flier Lettering
     print "FLIER\n----\n";
     $badge->Draw(stroke=>'black', fill=>'chartreuse', 
-		 primitive=>'rectangle', points=>'0,1090,820,1230');
+		 primitive=>'rectangle', points=>'0,1030,2100,2156');
     
     $text = '        FLIER';
     $badge->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
-		     x=>250, y=>(23*$font_step-30), 
-                     pointsize=>'88', fill=>'black', text=>$text);
+		     x=>850, y=>(8*$font_step-30 + 810), 
+                     pointsize=>'120', fill=>'black', text=>$text);
 
     # Signature not empty, match keywords for Vendor Lettering
     if ($r->[SIGNATURE] ne "") { 
-
-	
 	if (($r->[SIGNATURE] =~ m/Bay Area Rocketry/)||
 	    ($r->[SIGNATURE] =~ m/Aerotech/)||
 	    ($r->[SIGNATURE] =~ m/Vendor/)||
@@ -357,35 +340,34 @@ for my $r (@rows) {
 	    ($r->[SIGNATURE] =~ m/Black/)||
 	    ($r->[SIGNATURE] =~ m/Photos/)||
 	    ($r->[SIGNATURE] =~ m/Rocketman/)||
-	    ($r->[SIGNATURE] =~ m/Wilson/)||	    
+	    ($r->[SIGNATURE] =~ m/Wilson/)||	    	    	    
 	    ($r->[SIGNATURE] =~ m/RAF/)||
 	    ($r->[SIGNATURE] =~ m/AMW/)) {
-
 	    print "VENDOR\n----\n";
 	    $badge->Draw(stroke=>'black', fill=>'orange', 
-			 primitive=>'rectangle', points=>'0,1090,820,1230');
+			 primitive=>'rectangle', points=>'0,1030,2100,2156');
 
 	    $text = '       VENDOR';
 	    $badge->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
-			     x=>180, y=>(23*$font_step-30), pointsize=>'88', 
-                             fill=>'black', text=>$text);
+		     x=>850, y=>(8*$font_step-30 + 810), 
+                     pointsize=>'120', fill=>'black', text=>$text);
 	    
 	}  
 	# Staff Lettering
 	if (($r->[SIGNATURE] =~ m/TCC/)||
 	    ($r->[SIGNATURE] =~ m/LDRS/)||
-	    ($r->[SIGNATURE] =~ m/TRA/)||
+	    ($r->[SIGNATURE] =~ m/TRA/)||	    
+	    ($r->[SIGNATURE] =~ m/AeroPAC/)||	    
 	    ($r->[SIGNATURE] =~ m/Tripoli Central California/)||
 	    ($r->[SIGNATURE] =~ m/ANYTHING/)) {
 	    print "STAFF\n----\n";
 	    $badge->Draw(stroke=>'black', fill=>'OrangeRed', 
-                         primitive=>'rectangle', points=>'0,1090,820,1230');
+                         primitive=>'rectangle', points=>'0,1030,2100,2156');
 
 	    $text = '        STAFF';
 	    $badge->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
-			     x=>250, y=>(23*$font_step-30), pointsize=>'88', 
-                             fill=>'black', text=>$text);
-	    
+		     x=>850, y=>(8*$font_step-30 + 810), 
+                     pointsize=>'120', fill=>'black', text=>$text);
 	}
 
 	# Special Spectator 
@@ -393,33 +375,15 @@ for my $r (@rows) {
 	    ($r->[SIGNATURE] =~ m/Visitor/)) {
 
 	    print "SPECTATOR\n----\n";
-	    $badge->Draw(stroke=>'white', fill=>'Red', 
-                         primitive=>'rectangle', points=>'0,1090,820,1230');
+	    $badge->Draw(stroke=>'black', fill=>'Red', 
+                         primitive=>'rectangle', points=>'0,1030,2100,2156');
 	    $text = '     SPECTATOR';
-	    $badge->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
-			     x=>150, y=>(23*$font_step-30), pointsize=>'80', 
-                             fill=>'black', text=>$text);
-	    
+ 	    $badge->Annotate(font=>'fonts/Helvetica-BlackItalic.ttf', 
+		     x=>850, y=>(8*$font_step-30 + 810), 
+                     pointsize=>'120', fill=>'black', text=>$text);
 	}
     }
 
-    $font_step = 53;
-    # Mangle Signature to 37 chars to fit
-    $text = $r->[SIGNATURE];
-
-#    if (length $r->[SIGNATURE] >=35) {
-#	$ps = 14;
-#	$text = substr($text, 0, 37);
-#    } 
-#    else {
-#	$ps = 36;
-#    }
-    # Put out signature text only if Name is not null (for empties)
-    if ($r->[FNAME] ne "") { 
-	$image->Annotate(font=>'fonts/HelveticaNw.ttf', 
-			 x=>30, y=>(20*$font_step+2), pointsize=>22, 
-                         fill=>$font_color, text=>$text);
-    }
     # Adorn badge with stars based on Level
     my $star_image = "";
     my $star_count = 0;
@@ -443,10 +407,10 @@ for my $r (@rows) {
     if ($star_count > 0) { 
 	$image->Read($star_image);
 	$star_icon = $image->[ (scalar @$image - 1)];
-	$star_icon->Resize(width=>70, height=>70);
+	$star_icon->Resize(width=>140, height=>140);
 	for (my $i=0; $i < $star_count; $i++) {
 	    $badge->Composite(image=>$star_icon, 
-			      x=>(580 + 70*$i), y=>(18*$font_step - 7));
+			      x=>(900 + 140*$i), y=>(8*$font_step +28 + $img_offset));
         }
     }
 
@@ -483,27 +447,27 @@ for my $r (@rows) {
     $image->Read("$TOPDIR/$idcode-upc.png");
     my $barcode = $image->[ (scalar @$image - 1)];
     # Image is 810x1230, barcode 109x50, put towards bottom left
-    $badge->Composite(image=>$barcode, x=>8, y=>1180);
+    $badge->Composite(image=>$barcode, x=>1820, y=>1120);
     system "rm -f $TOPDIR/$idcode-upc.png";
 
     # Signature text on bottom of badge
     $text = "    Badge#".$idcode."        Serial:".$signature."\n";
-    $badge->Annotate(font=>'system', x=>160, y=>1226,fill=>'black', text=>$text);
+    $badge->Annotate(font=>'system', x=>1400, y=>1200,fill=>'black', text=>$text);
     my $tcc_logo; 			      
-    $image->Read('images/TCC_Logo_156x156.png');
+    $image->Read('images/TCC_Logo.png');
     $tcc_logo = $image->[ ((scalar @$image) - 1)];
-#    $tcc_logo->Resize(width=>150, height=>84);
-    $badge->Composite(image=>$tcc_logo, x=>625, y=>200);
+    $tcc_logo->Resize(width=>300, height=>300);
+    $badge->Composite(image=>$tcc_logo, x=>1658, y=>550);
 
     # Make unique Filename from Badge ID and Org ID
-    $filename = "png24:".$TOPDIR."LDRS37-Badge-00".$idcode."-".$r->[ORG]."-".$r->[IDNUM]."-tp.png";
+    $filename = "png24:".$TOPDIR."LDRS37-Badge-00".$idcode."-".$r->[ORG]."-".$r->[IDNUM]."-cr80.png";
 
     print "Write ...";
     $x = $badge->Write($filename);
     warn "$x" if "$x";
 
+    $filename = $TOPDIR."LDRS37-Badge-00".$idcode."-".$r->[ORG]."-".$r->[IDNUM]."-cr80.png";
     print "Wrote Badge: [".$filename."]\n";
-    $filename = $TOPDIR."LDRS37-Badge-00".$idcode."-".$r->[ORG]."-".$r->[IDNUM]."-tp.png";
 
 }
 
