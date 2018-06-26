@@ -41,18 +41,6 @@ split:
 	cd badges-duracard; ls -t *.jpg >../badgelist.csv; cd - 
 #	sort -u badgelist.csv
 	mv badgelist.csv badges-duracard
-#	cd badges-duracard; split -l 25 -d --additional-suffix=.csv badgelist.csv badges; rm badgelist.csv;cd -
-	cat  filelists/25fliers.csv >> badges-duracard/badgelist.csv
-	cat  filelists/25fliers.csv >> badges-duracard/badgelist.csv
-	cat  filelists/25fliers.csv >> badges-duracard/badgelist.csv
-	cat  filelists/25fliers.csv >> badges-duracard/badgelist.csv
-	cat  filelists/25level0.csv >> badges-duracard/badgelist.csv
-	cat  filelists/25staff.csv >> badges-duracard/badgelist.csv
-	cat  filelists/25vendor.csv >> badges-duracard/badgelist.csv
-	cat  filelists/10spectator.csv >> badges-duracard/badgelist.csv
-
-
-
 
 clean:
 	rm -fr badges
